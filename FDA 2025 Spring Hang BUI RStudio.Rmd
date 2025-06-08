@@ -1,0 +1,382 @@
+---
+Function: TARIFF IMPACTS ON PORTFOLIO MANAGEMENT
+Author: Hang BUI
+Student ID: 22070661
+Class: FDA 2025 Spring
+Version and Date: 1.0 20250524 Initial codes
+---
+#1. List of 50 top performing stocks in the U.S
+```{r}
+# Load required libraries
+library(quantmod)
+library(dplyr)
+library(readr)
+library(lubridate)
+
+# List of 50 top-performing S&P 500 stocks (by market cap and performance)
+top_50_stocks <- c(
+  "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "BRK-B", "UNH", "JNJ",
+  "V", "WMT", "JPM", "PG", "MA", "HD", "CVX", "ABBV", "BAC", "PFE",
+  "KO", "AVGO", "PEP", "TMO", "COST", "DIS", "ABT", "ACN", "NFLX", "ADBE",
+  "CRM", "VZ", "DHR", "XOM", "NKE", "MRK", "T", "CSCO", "INTC", "WFC",
+  "AMD", "TXN", "LLY", "QCOM", "NEE", "UPS", "PM", "LOW", "HON", "IBM"
+)
+
+# Set date range  
+start_date <- "2024-01-01"  
+end_date <- Sys.Date()
+
+# Function to download stock data safely
+download_stock_data <- function(symbol, start, end) {
+  tryCatch({
+    cat("Downloading data for:", symbol, "\n")
+    data <- getSymbols(symbol, 
+                      src = "yahoo", 
+                      from = start, 
+                      to = end, 
+                      auto.assign = FALSE)
+    
+    # Convert to data frame and add symbol column
+    df <- data.frame(
+      Date = index(data),
+      Symbol = symbol,
+      Open = as.numeric(Op(data)),
+      High = as.numeric(Hi(data)),
+      Low = as.numeric(Lo(data)),
+      Close = as.numeric(Cl(data)),
+      Volume = as.numeric(Vo(data)),
+      Adjusted = as.numeric(Ad(data))
+    )
+    
+    return(df)
+  }, error = function(e) {
+    cat("Error downloading", symbol, ":", e$message, "\n")
+    return(NULL)
+  })
+}
+
+# Download data for all stocks
+cat("Starting download of stock data...\n")
+cat("Date range:", as.character(start_date), "to", as.character(end_date), "\n\n")
+
+all_stock_data <- list()
+
+for (stock in top_50_stocks) {
+  stock_data <- download_stock_data(stock, start_date, end_date)
+  if (!is.null(stock_data)) {
+    all_stock_data[[stock]] <- stock_data
+  }
+  Sys.sleep(0.5)  # Be respectful to Yahoo Finance API
+}
+
+# Combine all data into one data frame
+combined_data <- bind_rows(all_stock_data)
+
+write_csv(combined_data, "D:/BUI THU HANG/NĂM BA/FDA/FDA 2025 Spring Hang BUI Top50 Stock.csv")
+cat("Data saved as CSV: FDA 2025 Spring Hang BUI Top50 Stock\n")
+```
+#2. The impact of US presidential election  
+##2.1 The impact of US presidential election on 50 corporations
+```{r}
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(lubridate)
+library(scales)
+
+# Đọc dữ liệu
+stock_data <- read_csv("D:/BUI THU HANG/NĂM BA/FDA/FDA 2025 Spring Hang BUI Top50 Stock.csv")
+
+# Thông tin ngành
+stock_categories <- data.frame(
+  Symbol = c("AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "BRK-B", "UNH", "JNJ",
+             "V", "WMT", "JPM", "PG", "MA", "HD", "CVX", "ABBV", "BAC", "PFE",
+             "KO", "AVGO", "PEP", "TMO", "COST", "DIS", "ABT", "ACN", "NFLX", "ADBE",
+             "CRM", "VZ", "DHR", "XOM", "NKE", "MRK", "T", "CSCO", "INTC", "WFC",
+             "AMD", "TXN", "LLY", "QCOM", "NEE", "UPS", "PM", "LOW", "HON", "IBM"),
+  Sector = c("Technology", "Technology", "Technology", "Consumer Discretionary", "Technology", 
+             "Consumer Discretionary", "Technology", "Financial", "Healthcare", "Healthcare",
+             "Financial", "Consumer Staples", "Financial", "Consumer Staples", "Financial", 
+             "Consumer Discretionary", "Energy", "Healthcare", "Financial", "Healthcare",
+             "Consumer Staples", "Technology", "Consumer Staples", "Healthcare", "Consumer Staples", 
+             "Communication", "Healthcare", "Technology", "Communication", "Technology",
+             "Technology", "Communication", "Healthcare", "Energy", "Consumer Discretionary", 
+             "Healthcare", "Communication", "Technology", "Technology", "Financial",
+             "Technology", "Technology", "Healthcare", "Technology", "Utilities", 
+             "Industrials", "Consumer Staples", "Consumer Discretionary", "Industrials", "Technology")
+)
+
+stock_data <- stock_data %>% left_join(stock_categories, by = "Symbol")
+
+# Các mốc sự kiện : chỉ lấy events trong khoảng thời gian cần plot
+tariff_dates <- data.frame(
+  Date = as.Date(c("2024-11-05", "2025-04-02", "2025-04-17")),
+  Event = c("US Election", "Tariff Announce", "Tariff Defer")
+)
+
+plot_data <- stock_data %>%
+  mutate(Date = as.Date(Date))
+
+events_in_range <- tariff_dates %>%
+  filter(!Event %in% c("Tariff Announce", "Tariff Defer"))
+
+# Tính max y value trước khi vẽ
+max_price <- max(plot_data$Adjusted, na.rm = TRUE)
+
+# Vẽ biểu đồ với tất cả 50 công ty  
+p1 <- ggplot(plot_data, aes(x = Date, y = Adjusted, color = Symbol)) +
+  geom_line(linewidth = 0.5, alpha = 0.7) +
+  scale_y_continuous(labels = dollar_format(prefix = "$")) +
+  scale_x_date(
+    limits = as.Date(c("2024-10-01", "2025-05-31")),
+    date_breaks = "1 month",
+    date_labels = "%b %Y"
+  ) +
+  labs(
+    title = "Stock Prices of Top 50 US Corporations",
+    subtitle = "after US Election",
+    x = "Date", y = "Adjusted Close Price (USD)",
+    color = "Company"
+  ) +
+  geom_vline(data = events_in_range, aes(xintercept = Date), 
+             linetype = "dashed", color = "red", linewidth = 1) +
+  geom_text(data = events_in_range, aes(x = Date, y = max_price * 0.95,
+                                        label = Event), 
+            angle = 90, vjust = -0.5, hjust = 1, color = "red", size = 3) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+print(p1)
+
+# Tạo thêm biểu đồ theo sector để dễ nhìn hơn
+sector_data <- plot_data %>%
+  group_by(Date, Sector) %>%
+  summarise(Avg_Price = mean(Adjusted, na.rm = TRUE), .groups = 'drop')
+
+p2 <- ggplot(sector_data, aes(x = Date, y = Avg_Price, color = Sector)) +
+  geom_line(linewidth = 1.2) +
+  scale_y_continuous(labels = dollar_format(prefix = "$")) +
+  labs(
+    title = "Average Stock Prices by Sector",
+    subtitle = "Top 50 S&P Companies - Election",
+    x = "Date", y = "Average Adjusted Close Price (USD)",
+    color = "Sector"
+  ) +
+  geom_vline(data = events_in_range, aes(xintercept = Date), 
+             linetype = "dashed", color = "black", linewidth = 1) +
+  geom_text(data = events_in_range, aes(x = Date, y = max(sector_data$Avg_Price) * 0.95,
+                                    label = Event), 
+            angle = 90, vjust = -0.5, hjust = 1, color = "black", size = 3) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+print(p2)
+
+```
+
+##2.2 The impact of US presidential election on Google (GOOGL)
+```{r}
+stock_data <- stock_data %>% left_join(stock_categories, by = "Symbol")
+
+# Các mốc sự kiện - SỬA LỖI: chỉ lấy events trong khoảng thời gian cần plot
+tariff_dates <- data.frame(
+  Date = as.Date(c("2024-11-05", "2025-04-02", "2025-04-17")),
+  Event = c("US Election", "Tariff Announce", "Tariff Defer")
+)
+
+plot_data <- stock_data %>%
+  mutate(Date = as.Date(Date))
+
+events_in_range <- tariff_dates %>%
+  filter(!Event %in% c("Tariff Announce", "Tariff Defer"))
+
+# SỬA LỖI: Tính max y value trước khi vẽ
+max_price <- max(plot_data$Adjusted, na.rm = TRUE)
+
+# Lọc dữ liệu cho GOOGL
+tsla_data <- plot_data %>% filter(Symbol == "GOOGL")
+
+# Vẽ biểu đồ cho GOOGL
+p_tsla <- ggplot(tsla_data, aes(x = Date, y = Adjusted)) +
+  geom_line(color = "blue", linewidth = 1) +
+  scale_y_continuous(labels = dollar_format(prefix = "$")) +
+  scale_x_date(
+    limits = as.Date(c("2024-10-01", "2025-05-31")),
+    date_breaks = "1 month",
+    date_labels = "%b %Y"
+  ) +
+  labs(
+    title = "Stock Price of Google (GOOGL)",
+    subtitle = "after US Election",
+    x = "Date", y = "Adjusted Close Price (USD)"
+  ) +
+  geom_vline(data = events_in_range, aes(xintercept = Date), 
+             linetype = "dashed", color = "red", linewidth = 1) +
+  geom_text(data = events_in_range, aes(x = Date, y = max(tsla_data$Adjusted, na.rm = TRUE) * 0.95,
+                                        label = Event), 
+            angle = 90, vjust = -0.5, hjust = 1, color = "red", size = 3) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(p_tsla)
+
+```
+
+#3. The impact of recent tariff policy developments 
+##3.1 The impact of recent tariff policy developments on 50 corporations
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(lubridate)
+library(scales)
+
+# Đọc dữ liệu
+stock_data <- read_csv("D:/BUI THU HANG/NĂM BA/FDA/FDA 2025 Spring Hang BUI Top50 Stock.csv")
+
+# Thông tin ngành
+stock_categories <- data.frame(
+  Symbol = c("AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "BRK-B", "UNH", "JNJ",
+             "V", "WMT", "JPM", "PG", "MA", "HD", "CVX", "ABBV", "BAC", "PFE",
+             "KO", "AVGO", "PEP", "TMO", "COST", "DIS", "ABT", "ACN", "NFLX", "ADBE",
+             "CRM", "VZ", "DHR", "XOM", "NKE", "MRK", "T", "CSCO", "INTC", "WFC",
+             "AMD", "TXN", "LLY", "QCOM", "NEE", "UPS", "PM", "LOW", "HON", "IBM"),
+  Sector = c("Technology", "Technology", "Technology", "Consumer Discretionary", "Technology", 
+             "Consumer Discretionary", "Technology", "Financial", "Healthcare", "Healthcare",
+             "Financial", "Consumer Staples", "Financial", "Consumer Staples", "Financial", 
+             "Consumer Discretionary", "Energy", "Healthcare", "Financial", "Healthcare",
+             "Consumer Staples", "Technology", "Consumer Staples", "Healthcare", "Consumer Staples", 
+             "Communication", "Healthcare", "Technology", "Communication", "Technology",
+             "Technology", "Communication", "Healthcare", "Energy", "Consumer Discretionary", 
+             "Healthcare", "Communication", "Technology", "Technology", "Financial",
+             "Technology", "Technology", "Healthcare", "Technology", "Utilities", 
+             "Industrials", "Consumer Staples", "Consumer Discretionary", "Industrials", "Technology")
+)
+
+stock_data <- stock_data %>% left_join(stock_categories, by = "Symbol")
+
+# Các mốc sự kiện - SỬA LỖI: chỉ lấy events trong khoảng thời gian cần plot
+tariff_dates <- data.frame(
+  Date = as.Date(c("2024-11-05", "2025-04-02", "2025-04-17")),
+  Event = c("US Election", "Tariff Announce", "Tariff Defer")
+)
+
+plot_data <- stock_data %>%
+  mutate(Date = as.Date(Date))
+
+events_in_range <- tariff_dates %>%
+  filter(Event %in% c("Tariff Announce", "Tariff Defer"))
+
+# SỬA LỖI: Tính max y value trước khi vẽ
+max_price <- max(plot_data$Adjusted, na.rm = TRUE)
+
+# Vẽ biểu đồ với tất cả 50 công ty - SỬA LỖI size thành linewidth
+p1 <- ggplot(plot_data, aes(x = Date, y = Adjusted, color = Symbol)) +
+  geom_line(linewidth = 0.5, alpha = 0.7) +
+  scale_y_continuous(labels = dollar_format(prefix = "$")) +
+  scale_x_date(
+    limits = as.Date(c("2024-10-01", "2025-05-31")),
+    date_breaks = "1 month",
+    date_labels = "%b %Y"
+  ) +
+  labs(
+    title = "Stock Prices of Top 50 US Corporations",
+    subtitle = "after Tariff Policy Dates",
+    x = "Date", y = "Adjusted Close Price (USD)",
+    color = "Company"
+  ) +
+  geom_vline(data = events_in_range, aes(xintercept = Date), 
+             linetype = "dashed", color = "red", linewidth = 1) +
+  geom_text(data = events_in_range, aes(x = Date, y = max_price * 0.95,
+                                        label = Event), 
+            angle = 90, vjust = -0.5, hjust = 1, color = "red", size = 3) +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+print(p1)
+
+# Tạo thêm biểu đồ theo sector để dễ nhìn hơn
+sector_data <- plot_data %>%
+  group_by(Date, Sector) %>%
+  summarise(Avg_Price = mean(Adjusted, na.rm = TRUE), .groups = 'drop')
+
+p2 <- ggplot(sector_data, aes(x = Date, y = Avg_Price, color = Sector)) +
+  geom_line(linewidth = 1.2) +
+  scale_y_continuous(labels = dollar_format(prefix = "$")) +
+  labs(
+    title = "Average Stock Prices by Sector",
+    subtitle = "Top 50 S&P Companies - Tariff Impact",
+    x = "Date", y = "Average Adjusted Close Price (USD)",
+    color = "Sector"
+  ) +
+  geom_vline(data = events_in_range, aes(xintercept = Date), 
+             linetype = "dashed", color = "black", linewidth = 1) +
+  geom_text(data = events_in_range, aes(x = Date, y = max(sector_data$Avg_Price) * 0.95,
+                                    label = Event), 
+            angle = 90, vjust = -0.5, hjust = 1, color = "black", size = 3) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+print(p2)
+```
+
+##3.2 The impact of recent tariff policy developments on Google (GOOGL)
+```{r}
+stock_data <- stock_data %>% left_join(stock_categories, by = "Symbol")
+
+# Các mốc sự kiện - SỬA LỖI: chỉ lấy events trong khoảng thời gian cần plot
+tariff_dates <- data.frame(
+  Date = as.Date(c("2024-11-05", "2025-04-02", "2025-04-17")),
+  Event = c("US Election", "Tariff Announce", "Tariff Defer")
+)
+
+plot_data <- stock_data %>%
+  mutate(Date = as.Date(Date))
+
+events_in_range <- tariff_dates %>%
+  filter(Event %in% c("Tariff Announce", "Tariff Defer"))
+
+# SỬA LỖI: Tính max y value trước khi vẽ
+max_price <- max(plot_data$Adjusted, na.rm = TRUE)
+
+# Lọc dữ liệu cho GOOGL
+tsla_data <- plot_data %>% filter(Symbol == "TSLA")
+
+# Vẽ biểu đồ cho GOOGL
+p_tsla <- ggplot(tsla_data, aes(x = Date, y = Adjusted)) +
+  geom_line(color = "blue", linewidth = 1) +
+  scale_y_continuous(labels = dollar_format(prefix = "$")) +
+  scale_x_date(
+    limits = as.Date(c("2024-10-01", "2025-05-31")),
+    date_breaks = "1 month",
+    date_labels = "%b %Y"
+  ) +
+  labs(
+    title = "Stock Price of Google (GOOGL)",
+    subtitle = "after Tariff Policy Dates",
+    x = "Date", y = "Adjusted Close Price (USD)"
+  ) +
+  geom_vline(data = events_in_range, aes(xintercept = Date), 
+             linetype = "dashed", color = "red", linewidth = 1) +
+  geom_text(data = events_in_range, aes(x = Date, y = max(tsla_data$Adjusted, na.rm = TRUE) * 0.95,
+                                        label = Event), 
+            angle = 90, vjust = -0.5, hjust = 1, color = "red", size = 3) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(p_tsla)
+
+```
